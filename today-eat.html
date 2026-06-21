@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#241E1A">
+<title>今天吃什么</title>
+<style>
+  :root{
+    --box:#241E1A;--boxSoft:#322A24;--cream:#F4EEE1;--creamAlt:#ECE2CE;
+    --ink:#2A2018;--inkSoft:#7A6A58;--line:#D8CCB4;--tomato:#C24A33;
+    --tomatoDeep:#9C3622;--basil:#6E8B3D;--gold:#CC9A3E;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--box);min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);}
+  .wrap{max-width:460px;margin:0 auto;padding:24px 16px 56px;}
+  .serif{font-family:Georgia,"Songti SC","STSong",serif;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  .tap{transition:transform .12s;}
+  .tap:active{transform:scale(.97);}
+  input,textarea{font-family:inherit;}
+  textarea{resize:none;}
+  .ovl{position:fixed;inset:0;z-index:50;background:rgba(20,16,14,.55);
+    overflow-y:auto;display:flex;justify-content:center;}
+  .sheet{width:100%;max-width:460px;margin:40px 16px 24px;background:var(--cream);
+    border-radius:26px;padding:24px;align-self:flex-start;}
+  @keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+  .pop{animation:pop .35s cubic-bezier(.2,.8,.2,1);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+
+/* ---------- palette + icons ---------- */
+var C={box:"#241E1A",boxSoft:"#322A24",cream:"#F4EEE1",creamAlt:"#ECE2CE",ink:"#2A2018",
+  inkSoft:"#7A6A58",line:"#D8CCB4",tomato:"#C24A33",tomatoDeep:"#9C3622",basil:"#6E8B3D",gold:"#CC9A3E"};
+
+var ICON={
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  x:'<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  trash:'<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  calendar:'<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 2v4"/><path d="M16 2v4"/>',
+  sparkles:'<path d="M12 3l1.8 4.9 4.9 1.8-4.9 1.8L12 16.4l-1.8-4.9L5.3 9.7l4.9-1.8z"/>',
+  dice:'<rect width="14" height="14" x="5" y="5" rx="3"/><circle cx="9.5" cy="9.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.1" fill="currentColor" stroke="none"/>',
+  arrows:'<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>',
+  utensils:'<path d="M7 2v20"/><path d="M5 2v6a2 2 0 0 0 4 0V2"/><path d="M16 2v20"/><path d="M16 8c2 0 3-1.5 3-4s-1-2-3-2"/>',
+  clipboard:'<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M8 11h8"/><path d="M8 15h6"/>',
+  party:'<path d="M5 12 2 22l10-3"/><path d="m12 9 7 7"/><path d="M14 5a3 3 0 0 0 3 3"/><path d="M18 2a3 3 0 0 0 3 3"/>',
+  flame:'<path d="M12 3c.5 2.5 2 4 3.5 5.5C17 10 18 11.5 18 14a6 6 0 1 1-12 0c0-1.5.5-2.8 1.5-3.8 0 1 .5 1.8 1.5 1.8 1 0 1.5-1 1.5-2.5 0-2 0-3.5-2-5C11 4.5 11.5 3.7 12 3z"/>'
+};
+function ico(name,size,color){size=size||20;
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="'+(color?'color:'+color+';':'')+'vertical-align:middle;flex:none;">'+ICON[name]+'</svg>';
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+/* ---------- static data ---------- */
+var ROUTINE_PREP=[
+  {group:"蒸锅 · 分层码好",items:["下层碗:鹰嘴豆/黑豆 干豆50g + 温水300ml(没过3cm)","中层:鸡蛋2个","上层:红薯/紫薯1根 150–200g(带皮)","蒸格:胡萝卜/南瓜/西兰花 150–200g","旁边:腌好的鸡胸/虾仁 100–150g"]},
+  {group:"电饭煲",items:["白米 半杯60g 生重 + 水"]},
+  {group:"桌上 / 门口 · 早上抓了就走",items:["香蕉1根","纯牛奶1盒250ml","小苹果/橙子/猕猴桃1个"]},
+  {group:"冰箱显眼处",items:["无糖酸奶1桶(晚上喝150–200g)"]},
+  {group:"定时设置 · 最容易忘",items:["电饭煲6:00启动(保温)","蒸锅6:30启动 · 蒸25分钟(保温)"]}
+];
+var COMMON_MEALS=[
+  {time:"7:10",title:"出门路上",food:"香蕉1 · 水煮蛋1 · 纯牛奶250ml · 水250ml"},
+  {time:"8:00",title:"到公司 · 早餐",food:"蒸红薯1 · 水煮蛋1 · 豆80g · 蒸菜100–150g · 核桃/杏仁10–15g"},
+  {time:"12:00",title:"午餐 · 自带饭盒",food:"白米饭120g · 鸡胸/虾仁/卤牛肉100–150g · 蒸菜100–150g"}
+];
+var POST_MEAL={time:"19:30",title:"餐后",food:"无糖酸奶150–200g · 巴西坚果1–2颗"};
+function trainDay(){return COMMON_MEALS.map(function(m){return Object.assign({},m);}).concat([
+  {time:"15:00",title:"下午加餐",food:"香蕉1根"},
+  {time:"18:00",title:"晚餐 · 加码",food:"三文鱼/豆腐/白鱼100–150g · 蒸菜200–250g · 蛋白+150g · 红薯200g"},
+  Object.assign({},POST_MEAL)]);}
+function liftDay(){return COMMON_MEALS.map(function(m){return Object.assign({},m);}).concat([
+  {time:"15:00",title:"下午加餐 · 力量日",food:"香蕉1根(练前补碳) · 核桃2颗"},
+  {time:"18:00",title:"晚餐 · 力量日略加",food:"三文鱼/豆腐/白鱼100–150g · 蒸菜200–250g · 蛋白+100g · 红薯100–150g"},
+  Object.assign({},POST_MEAL)]);}
+function normalDay(){return COMMON_MEALS.map(function(m){return Object.assign({},m);}).concat([
+  {time:"15:00",title:"下午加餐 · 饿时",food:"豆50–80g · 小番茄/黄瓜 · 核桃2颗"},
+  {time:"18:00",title:"晚餐",food:"三文鱼/豆腐/白鱼100–150g · 蒸菜200–250g · 碳水可选30–50g或不吃"},
+  Object.assign({},POST_MEAL)]);}
+var DAYS=[
+  {key:"mon",label:"周一",short:"一",tier:"high"},
+  {key:"tue",label:"周二",short:"二",tier:"base"},
+  {key:"wed",label:"周三",short:"三",tier:"mid"},
+  {key:"thu",label:"周四",short:"四",tier:"high"},
+  {key:"fri",label:"周五",short:"五",tier:"base"}
+];
+function tplFor(t){return t==="high"?trainDay():t==="mid"?liftDay():normalDay();}
+function seedSchedule(){var o={};DAYS.forEach(function(d){o[d.key]=tplFor(d.tier);});return o;}
+var SEED_RECIPES=[{
+  id:"pasta",name:"肉酱番茄意面",bucket:"weekend",time:"15 分钟",servings:"2 人份",
+  ingredients:[
+    {item:"Barilla 意面 #5",amount:"150g",note:"细面裹酱能力强"},
+    {item:"黑猪肉馅(肥瘦2:8)",amount:"200g",note:"盒马冰鲜"},
+    {item:"生冻南美白虾仁",amount:"450g(3袋)",note:"去肠,半冻直接下锅"},
+    {item:"普罗旺斯番茄",amount:"3个",note:"沙瓤多汁,切丁"},
+    {item:"CIRIO 番茄膏",amount:"50g(约2大勺)",note:"纯番茄无添加"},
+    {item:"洋葱",amount:"1/4个",note:"切碎,熬酱提甜"},
+    {item:"鸡蛋",amount:"2个",note:"可选,关火后卧溏心蛋"},
+    {item:"有机绿豆芽",amount:"350g",note:"焯水沥干,盘边脆口"},
+    {item:"盐、黑胡椒",amount:"适量",note:"调味"}
+  ],
+  steps:[
+    "备料:洋葱切碎,番茄切丁,虾仁取出(不用完全解冻)。",
+    "烧水:大锅水烧开,准备煮意面。",
+    "熬酱(同步):热油下洋葱炒香→下肉馅炒散发白→下番茄丁炒出汁→加番茄膏+半碗煮面水→加盐黑胡椒小火熬5分钟。",
+    "煮面:水开下意面煮8分钟;最后2分钟下虾仁同煮。",
+    "组装:意面和虾仁捞出,入酱锅翻匀裹酱。",
+    "卧蛋:关火,面中挖两坑打入鸡蛋,盖盖焖2分钟至溏心。",
+    "配菜:绿豆芽焯水1分钟,沥干放盘边(不调味)。"
+  ],
+  notes:["面150g : 酱50g → 裹酱刚好","肉200g : 虾450g → 肉香+虾鲜","番茄3个 → 果肉感足"]
+}];
+
+/* ---------- storage ---------- */
+var K={rec:"sph:recipes:v1",sch:"sph:sched:v1",log:"sph:log:v1"};
+function load(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+var recipes=load(K.rec,null)||SEED_RECIPES;
+var sched=load(K.sch,null)||seedSchedule();
+var logData=load(K.log,{});
+save(K.rec,recipes);save(K.sch,sched);
+
+var ui={tab:"weekday",overlay:null,recipeId:null,addBucket:"weekday",
+  day:"mon",editIdx:null,prepDone:{},gachaPhase:"idle",drawn:null};
+
+/* ---------- date utils ---------- */
+function pad(n){return(n<10?"0":"")+n;}
+function dateKey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());}
+var JS2DAY={1:"mon",2:"tue",3:"wed",4:"thu",5:"fri"};
+function uid(){return Math.random().toString(36).slice(2,9);}
+
+/* ---------- small view helpers ---------- */
+function chip(inner){return '<span style="display:inline-flex;align-items:center;gap:5px;background:'+C.creamAlt+';color:'+C.inkSoft+';border-radius:999px;padding:4px 10px;font-size:12px;">'+inner+'</span>';}
+function tierBadge(t){
+  if(t==="high")return '<span style="background:#E7EFD6;color:'+C.basil+';font-size:12px;border-radius:999px;padding:2px 8px;">训练日 · 加量</span>';
+  if(t==="mid")return '<span style="background:#F7E9D6;color:#9A6E1E;font-size:12px;border-radius:999px;padding:2px 8px;">力量日 · 略加</span>';
+  return '<span style="background:'+C.creamAlt+';color:'+C.inkSoft+';font-size:12px;border-radius:999px;padding:2px 8px;">普通日</span>';
+}
+function metaChip(name,txt){return '<span style="display:inline-flex;align-items:center;gap:4px;background:'+C.creamAlt+';color:'+C.inkSoft+';border-radius:999px;padding:4px 9px;font-size:12px;">'+ico(name,12)+esc(txt)+'</span>';}
+
+/* ---------- main views ---------- */
+function miniCard(r){
+  return '<button class="tap" data-act="open-recipe" data-id="'+r.id+'" style="width:100%;text-align:left;background:'+C.cream+';border:1px solid '+C.line+';border-radius:18px;padding:16px;display:block;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+    +'<span class="serif" style="color:'+C.ink+';font-size:18px;">'+esc(r.name)+'</span>'+ico("utensils",16,C.tomato)+'</div>'
+    +'<div style="display:flex;gap:10px;margin-top:8px;color:'+C.inkSoft+';font-size:12px;">'
+    +'<span style="display:inline-flex;align-items:center;gap:4px;">'+ico("clock",12)+esc(r.time)+'</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:4px;">'+ico("users",12)+esc(r.servings)+'</span></div></button>';
+}
+function renderMain(){
+  var weekday=recipes.filter(function(r){return r.bucket==="weekday";});
+  var weekend=recipes.filter(function(r){return r.bucket==="weekend";});
+  var tabBtn=function(id,name,label,sub){var on=ui.tab===id;
+    return '<button class="tap" data-act="tab" data-tab="'+id+'" style="flex:1;text-align:left;border-radius:16px;padding:12px 14px;border:1px solid '+(on?C.cream:"transparent")+';background:'+(on?C.cream:C.boxSoft)+';color:'+(on?C.ink:"#B7A893")+';">'
+      +'<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;">'+ico(name,16)+label+'</div>'
+      +'<div style="font-size:12px;margin-top:2px;color:'+(on?C.inkSoft:"#8A7C68")+';">'+sub+'</div></button>';};
+
+  var html='<div class="wrap">'
+    +'<div style="display:flex;align-items:flex-end;justify-content:space-between;">'
+    +'<div><div style="color:'+C.gold+';letter-spacing:.28em;font-size:12px;font-weight:500;">KITCHEN · 食谱盒</div>'
+    +'<h1 class="serif" style="color:'+C.cream+';font-size:30px;margin:4px 0 0;">今天吃什么</h1></div>'
+    +'<button class="tap" data-act="add-open" style="display:inline-flex;align-items:center;gap:4px;background:'+C.tomato+';color:'+C.cream+';border-radius:999px;padding:8px 12px;font-size:14px;">'+ico("plus",16)+'加菜</button></div>'
+    +'<div style="display:flex;gap:12px;margin-top:20px;">'+tabBtn("weekday","calendar","周中",weekday.length+" 道 · 固定")+tabBtn("weekend","sparkles","周末",weekend.length+" 道 · 抽卡")+'</div>'
+    +'<div style="margin-top:20px;">';
+
+  if(ui.tab==="weekday"){
+    html+='<div style="display:flex;flex-direction:column;gap:12px;">'
+      +'<button class="tap" data-act="open-checkin" style="width:100%;text-align:left;background:'+C.tomato+';border-radius:18px;padding:16px;display:block;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;"><div style="color:#F6D9CE;letter-spacing:.18em;font-size:12px;font-weight:500;">今日打卡</div>'+ico("party",18,"#F6D9CE")+'</div>'
+      +'<div class="serif" style="color:'+C.cream+';font-size:20px;margin-top:4px;">记录今天的饮食</div>'
+      +'<div style="color:#F2C6B7;font-size:12px;margin-top:6px;">进网页逐餐划线 · 全天完成就撒花</div></button>'
+      +'<button class="tap" data-act="open-routine" style="width:100%;text-align:left;background:'+C.basil+';border-radius:18px;padding:16px;display:block;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;"><div style="color:#EAF0DC;letter-spacing:.18em;font-size:12px;font-weight:500;">每日固定流程</div>'+ico("clipboard",18,"#EAF0DC")+'</div>'
+      +'<div class="serif" style="color:'+C.cream+';font-size:20px;margin-top:4px;">睡前准备 + 周一到周五</div>'
+      +'<div style="color:#D5E0BE;font-size:12px;margin-top:6px;">睡前清单每晚相同 · 时间表按天切换</div></button>';
+    if(weekday.length===0){
+      html+='<div style="background:'+C.boxSoft+';border:1px solid #3E342C;border-radius:18px;padding:20px;text-align:center;">'
+        +'<p style="color:#C7B9A4;font-size:14px;line-height:1.6;margin:0;">流程之外,把几道周中常做的菜排进来,午晚餐的蛋白就有固定出处。</p>'
+        +'<button class="tap" data-act="add-open" style="margin-top:16px;display:inline-flex;align-items:center;gap:4px;background:'+C.tomato+';color:'+C.cream+';border-radius:999px;padding:8px 16px;font-size:14px;">'+ico("plus",15)+'加一道周中菜</button></div>';
+    } else { weekday.forEach(function(r){html+=miniCard(r);}); }
+    html+='</div>';
+  } else {
+    html+=renderGacha(weekend);
+  }
+  html+='</div></div>';
+  return html;
+}
+
+function renderGacha(list){
+  if(list.length===0){
+    return '<div style="background:'+C.boxSoft+';border:1px solid #3E342C;border-radius:18px;padding:24px;text-align:center;">'
+      +'<p style="color:#C7B9A4;font-size:14px;line-height:1.6;margin:0;">周末抽卡池是空的。多塞几道想吃又懒得决定的菜,周末抽到哪做哪。</p>'
+      +'<button class="tap" data-act="add-open" style="margin-top:16px;display:inline-flex;align-items:center;gap:4px;background:'+C.tomato+';color:'+C.cream+';border-radius:999px;padding:8px 16px;font-size:14px;">'+ico("plus",15)+'加一道周末菜</button></div>';
+  }
+  var revealed=ui.gachaPhase==="revealed"&&ui.drawn;
+  var drawn=revealed?recipes.filter(function(r){return r.id===ui.drawn;})[0]:null;
+  var card;
+  if(revealed&&drawn){
+    card='<div class="pop" style="background:'+C.cream+';border:1px solid '+C.line+';border-radius:22px;height:232px;padding:20px;display:flex;flex-direction:column;justify-content:space-between;">'
+      +'<div><div style="color:'+C.tomato+';letter-spacing:.2em;font-size:12px;font-weight:500;">抽到了</div>'
+      +'<div class="serif" style="color:'+C.ink+';font-size:30px;margin-top:4px;line-height:1.15;">'+esc(drawn.name)+'</div>'
+      +'<div style="display:flex;gap:12px;margin-top:12px;color:'+C.inkSoft+';font-size:14px;">'
+      +'<span style="display:inline-flex;align-items:center;gap:4px;">'+ico("clock",14)+esc(drawn.time)+'</span>'
+      +'<span style="display:inline-flex;align-items:center;gap:4px;">'+ico("users",14)+esc(drawn.servings)+'</span></div></div>'
+      +'<button class="tap" data-act="open-recipe" data-id="'+drawn.id+'" style="background:'+C.basil+';color:'+C.cream+';border-radius:12px;padding:10px;font-size:14px;font-weight:500;">看做法</button></div>';
+  } else {
+    var shuffling=ui.gachaPhase==="shuffling";
+    card='<div style="background:'+C.tomato+';border:2px dashed '+C.cream+';border-radius:22px;height:232px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:'+C.cream+';">'
+      +ico("utensils",44,C.cream)
+      +'<div style="letter-spacing:.3em;font-size:12px;margin-top:12px;font-weight:500;">WEEKEND</div>'
+      +'<div class="serif" style="font-size:24px;margin-top:4px;">'+(shuffling?"洗牌中…":"周末抽卡")+'</div></div>';
+  }
+  return '<div style="display:flex;flex-direction:column;align-items:center;">'+card
+    +'<button class="tap" data-act="draw" '+(ui.gachaPhase==="shuffling"?"disabled":"")+' style="margin-top:20px;display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:12px 24px;font-size:16px;font-weight:500;background:'+(revealed?C.boxSoft:C.gold)+';color:'+(revealed?C.cream:C.ink)+';">'
+    +ico("dice",18)+(revealed?"再抽一次":"抽一卡")+'</button>'
+    +'<p style="color:#8A7C68;font-size:12px;margin-top:16px;">卡池里有 '+list.length+' 道周末菜</p></div>';
+}
+
+/* ---------- checkin ---------- */
+function renderCheckin(){
+  var today=new Date(),tKey=dateKey(today),dayKey=JS2DAY[today.getDay()];
+  var dayInfo=DAYS.filter(function(d){return d.key===dayKey;})[0];
+  var meals=dayKey?(sched[dayKey]||[]):[];
+  var entry=logData[tKey]||{meals:{},complete:false};
+  var doneN=meals.filter(function(m){return entry.meals[m.time];}).length;
+  var allDone=meals.length>0&&doneN===meals.length;
+
+  var total=0;for(var k in logData){if(logData[k]&&logData[k].complete)total++;}
+  var streak=0,d=new Date(today),g=0;
+  while(g++<400){var wd=d.getDay();if(wd>=1&&wd<=5){var kk=dateKey(d);var e=logData[kk];if(e&&e.complete)streak++;else if(kk!==tKey)break;}d.setDate(d.getDate()-1);}
+  var recent=[],dd=new Date(today);while(recent.length<10){var w=dd.getDay();if(w>=1&&w<=5)recent.push(new Date(dd));dd.setDate(dd.getDate()-1);}recent.reverse();
+
+  var h='<div class="ovl" data-act="close"><div class="sheet" data-stop="1">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+    +'<div>'+chip(ico("party",12)+'今日打卡')+'<h2 class="serif" style="color:'+C.ink+';font-size:30px;margin:8px 0 0;line-height:1.15;">'+(today.getMonth()+1)+' 月 '+today.getDate()+' 日 · '+(dayInfo?dayInfo.label:"周末")+'</h2></div>'
+    +'<button class="tap" data-act="close" style="padding:4px;color:'+C.inkSoft+';">'+ico("x",22)+'</button></div>';
+
+  if(!dayKey){
+    h+='<div style="background:'+C.creamAlt+';border-radius:18px;padding:20px;text-align:center;margin-top:20px;"><p style="color:'+C.ink+';font-size:14px;line-height:1.6;margin:0;">今天是周末,没有固定计划。周中再来打卡,今天去 周末 那栏抽张卡犒劳自己。</p></div>';
+  } else {
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin:20px 0 4px;">'
+      +'<div style="display:flex;align-items:center;gap:8px;"><span style="color:'+C.ink+';font-size:14px;font-weight:500;">'+dayInfo.label+'</span>'+tierBadge(dayInfo.tier)+'</div>'
+      +'<span style="color:'+(allDone?C.basil:C.ink)+';font-size:14px;font-weight:500;">'+doneN+' / '+meals.length+'</span></div>'
+      +'<div style="background:'+C.creamAlt+';height:8px;border-radius:999px;overflow:hidden;"><div style="background:'+(allDone?C.basil:C.tomato)+';width:'+(meals.length?(doneN/meals.length*100):0)+'%;height:100%;transition:width .25s;"></div></div>';
+    if(allDone){
+      h+='<div style="background:#E7EFD6;border-radius:18px;padding:12px 16px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;">'
+        +'<span style="color:'+C.basil+';font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:6px;">'+ico("party",15)+'今天满分 · 连续 '+streak+' 天</span>'
+        +'<button data-act="burst" style="color:'+C.basil+';font-size:12px;text-decoration:underline;">再撒一次</button></div>';
+    }
+    h+='<div style="display:flex;flex-direction:column;margin-top:4px;">';
+    meals.forEach(function(m,i){var on=!!entry.meals[m.time];
+      h+='<button class="tap" data-act="toggle-meal" data-time="'+esc(m.time)+'" style="display:flex;align-items:flex-start;gap:12px;text-align:left;padding:12px 0;'+(i?'border-top:1px solid '+C.line+';':'')+'">'
+        +'<span style="flex:none;width:24px;height:24px;margin-top:2px;border-radius:999px;border:1px solid '+(on?C.basil:C.line)+';background:'+(on?C.basil:"transparent")+';color:'+C.cream+';display:flex;align-items:center;justify-content:center;">'+(on?ico("check",15):"")+'</span>'
+        +'<span style="min-width:0;"><span style="display:flex;align-items:baseline;gap:8px;"><span style="color:'+C.tomatoDeep+';font-size:14px;font-weight:500;">'+esc(m.time)+'</span><span style="color:'+C.inkSoft+';font-size:12px;">'+esc(m.title)+'</span></span>'
+        +'<span style="display:block;font-size:14px;line-height:1.5;margin-top:2px;color:'+(on?C.inkSoft:C.ink)+';'+(on?'text-decoration:line-through;':'')+'">'+esc(m.food)+'</span></span></button>';
+    });
+    h+='</div>';
+  }
+
+  h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">打卡记录</div>'
+    +'<div style="display:flex;gap:12px;">'
+    +'<div style="flex:1;background:'+(streak>0?"#F7E9D6":C.creamAlt)+';border-radius:18px;padding:16px;"><div style="color:'+C.inkSoft+';font-size:12px;display:flex;align-items:center;gap:4px;">'+ico("flame",13,streak>0?C.gold:C.inkSoft)+'连续满分</div><div style="color:'+C.ink+';font-size:24px;font-weight:500;margin-top:2px;">'+streak+' <span style="font-size:14px;font-weight:400;color:'+C.inkSoft+';">天</span></div></div>'
+    +'<div style="flex:1;background:'+C.creamAlt+';border-radius:18px;padding:16px;"><div style="color:'+C.inkSoft+';font-size:12px;">累计满分</div><div style="color:'+C.ink+';font-size:24px;font-weight:500;margin-top:2px;">'+total+' <span style="font-size:14px;font-weight:400;color:'+C.inkSoft+';">天</span></div></div></div>'
+    +'<div style="color:'+C.inkSoft+';font-size:12px;margin:16px 0 8px;">最近 10 个工作日</div><div style="display:flex;gap:6px;">';
+  recent.forEach(function(rd){var rk=dateKey(rd);var e=logData[rk];var full=e&&e.complete;var some=e&&!e.complete&&Object.keys(e.meals||{}).some(function(t){return e.meals[t];});var isToday=rk===tKey;
+    h+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;"><div style="width:22px;height:22px;border-radius:999px;background:'+(full?C.basil:some?"#E7EFD6":C.creamAlt)+';'+(isToday?'border:2px solid '+C.tomato+';':'')+'color:'+(full?C.cream:C.inkSoft)+';display:flex;align-items:center;justify-content:center;">'+(full?ico("check",12):"")+'</div><span style="color:'+C.inkSoft+';font-size:12px;">'+rd.getDate()+'</span></div>';
+  });
+  h+='</div></div></div></div>';
+  return h;
+}
+
+/* ---------- routine ---------- */
+function renderRoutine(){
+  var allItems=0;ROUTINE_PREP.forEach(function(g){allItems+=g.items.length;});
+  var doneCount=0;for(var k in ui.prepDone){if(ui.prepDone[k])doneCount++;}
+  var dayInfo=DAYS.filter(function(d){return d.key===ui.day;})[0];
+  var meals=sched[ui.day]||[];
+
+  var h='<div class="ovl" data-act="close"><div class="sheet" data-stop="1">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+    +'<div>'+chip(ico("calendar",12)+'周中固定')+'<h2 class="serif" style="color:'+C.ink+';font-size:30px;margin:8px 0 0;">每日固定流程</h2></div>'
+    +'<button class="tap" data-act="close" style="padding:4px;color:'+C.inkSoft+';">'+ico("x",22)+'</button></div>';
+
+  h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">睡前准备 · 每晚相同</div>'
+    +'<div style="background:'+C.creamAlt+';border-radius:18px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"><span style="color:'+C.inkSoft+';font-size:12px;">睡前清单 · 5 分钟搞定</span><span style="color:'+(doneCount===allItems?C.basil:C.ink)+';font-size:14px;font-weight:500;">'+doneCount+' / '+allItems+(doneCount===allItems?" · 全就位":"")+'</span></div>'
+    +'<div style="display:flex;flex-direction:column;gap:16px;">';
+  ROUTINE_PREP.forEach(function(g,gi){
+    h+='<div><div style="color:'+C.inkSoft+';font-size:12px;margin-bottom:6px;">'+esc(g.group)+'</div><div style="display:flex;flex-direction:column;">';
+    g.items.forEach(function(it,ii){var key=gi+"-"+ii;var on=!!ui.prepDone[key];
+      h+='<button class="tap" data-act="toggle-prep" data-k="'+key+'" style="display:flex;align-items:flex-start;gap:10px;text-align:left;padding:8px 0;'+(ii?'border-top:1px solid '+C.line+';':'')+'">'
+        +'<span style="flex:none;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1px solid '+(on?C.basil:C.line)+';background:'+(on?C.basil:"transparent")+';color:'+C.cream+';display:flex;align-items:center;justify-content:center;">'+(on?ico("check",13):"")+'</span>'
+        +'<span style="font-size:14px;line-height:1.35;color:'+(on?C.inkSoft:C.ink)+';'+(on?'text-decoration:line-through;':'')+'">'+esc(it)+'</span></button>';
+    });
+    h+='</div></div>';
+  });
+  h+='</div><button class="tap" data-act="reset-prep" style="width:100%;margin-top:16px;border:1px solid '+C.line+';border-radius:12px;padding:10px;font-size:14px;color:'+C.inkSoft+';">清空勾选,明晚再来</button></div>';
+
+  h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">全天时间表 · 按天</div><div style="display:flex;gap:6px;">';
+  DAYS.forEach(function(dy){var on=dy.key===ui.day;
+    h+='<button class="tap" data-act="day" data-day="'+dy.key+'" style="flex:1;border-radius:12px;padding:8px 0;font-size:14px;font-weight:500;background:'+(on?C.ink:C.creamAlt)+';color:'+(on?C.cream:C.inkSoft)+';">'+dy.short+'</button>';
+  });
+  h+='</div><div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;"><span style="color:'+C.ink+';font-size:14px;font-weight:500;">'+dayInfo.label+'</span>'+tierBadge(dayInfo.tier)+'</div><div style="display:flex;flex-direction:column;">';
+  meals.forEach(function(m,i){
+    h+='<div style="padding:12px 0;'+(i?'border-top:1px solid '+C.line+';':'')+'">'
+      +'<div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;"><div style="display:flex;align-items:baseline;gap:8px;min-width:0;"><span style="color:'+C.tomatoDeep+';font-size:14px;font-weight:500;">'+esc(m.time)+'</span><span style="color:'+C.inkSoft+';font-size:12px;">'+esc(m.title)+'</span></div>';
+    if(ui.editIdx!==i){h+='<button class="tap" data-act="edit-meal" data-idx="'+i+'" style="flex:none;padding:4px;color:'+C.inkSoft+';">'+ico("pencil",14)+'</button>';}
+    h+='</div>';
+    if(ui.editIdx===i){
+      h+='<div style="margin-top:8px;"><textarea id="edit-ta" rows="3" style="width:100%;border:1px solid '+C.line+';border-radius:12px;padding:8px 12px;font-size:14px;color:'+C.ink+';background:#fff;">'+esc(m.food)+'</textarea>'
+        +'<div style="display:flex;gap:8px;margin-top:8px;"><button class="tap" data-act="save-meal" data-idx="'+i+'" style="background:'+C.basil+';color:'+C.cream+';border-radius:8px;padding:6px 16px;font-size:14px;">保存</button><button data-act="cancel-edit" style="color:'+C.inkSoft+';border-radius:8px;padding:6px 12px;font-size:14px;">取消</button></div></div>';
+    } else {
+      h+='<div style="color:'+C.ink+';font-size:14px;line-height:1.5;margin-top:4px;">'+esc(m.food)+'</div>';
+    }
+    h+='</div>';
+  });
+  h+='</div><p style="color:'+C.inkSoft+';font-size:12px;margin-top:16px;line-height:1.6;">周一=周四(加量),周三力量日(略加),周二/五普通——都是种子内容。点铅笔可单独改某一餐,只动这一天,自动保存。</p></div>';
+
+  h+='</div></div>';
+  return h;
+}
+
+/* ---------- recipe detail ---------- */
+function renderRecipe(){
+  var r=recipes.filter(function(x){return x.id===ui.recipeId;})[0];
+  if(!r){ui.overlay=null;return renderMain();}
+  var h='<div class="ovl" data-act="close"><div class="sheet" data-stop="1">'
+    +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">'
+    +'<div>'+(r.bucket==="weekday"?chip(ico("calendar",12)+'周中固定'):chip(ico("sparkles",12)+'周末抽卡'))
+    +'<h2 class="serif" style="color:'+C.ink+';font-size:30px;margin:8px 0 0;line-height:1.15;">'+esc(r.name)+'</h2>'
+    +'<div style="display:flex;gap:8px;margin-top:12px;">'+metaChip("clock",r.time)+metaChip("users",r.servings)+'</div></div>'
+    +'<button class="tap" data-act="close" style="padding:4px;color:'+C.inkSoft+';">'+ico("x",22)+'</button></div>';
+
+  h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">食材</div><div style="display:flex;flex-direction:column;">';
+  r.ingredients.forEach(function(g,i){
+    h+='<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:8px 0;'+(i?'border-top:1px solid '+C.line+';':'')+'"><div style="min-width:0;"><div style="color:'+C.ink+';font-size:14px;">'+esc(g.item)+'</div>'+(g.note?'<div style="color:'+C.inkSoft+';font-size:12px;margin-top:2px;">'+esc(g.note)+'</div>':'')+'</div><div style="color:'+C.tomatoDeep+';font-size:14px;font-weight:500;white-space:nowrap;">'+esc(g.amount)+'</div></div>';
+  });
+  h+='</div></div>';
+
+  h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">做法</div><div style="display:flex;flex-direction:column;gap:12px;">';
+  r.steps.forEach(function(s,i){
+    h+='<div style="display:flex;gap:12px;"><span style="flex:none;width:24px;height:24px;border-radius:999px;background:'+C.tomato+';color:'+C.cream+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;">'+(i+1)+'</span><span style="color:'+C.ink+';font-size:14px;line-height:1.6;padding-top:2px;">'+esc(s)+'</span></div>';
+  });
+  h+='</div></div>';
+
+  if(r.notes&&r.notes.length){
+    h+='<div style="margin-top:24px;"><div style="color:'+C.basil+';letter-spacing:.2em;font-size:12px;font-weight:500;margin-bottom:12px;">黄金比例</div><div style="background:'+C.creamAlt+';border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:6px;">';
+    r.notes.forEach(function(n){h+='<div style="color:'+C.ink+';font-size:14px;">'+esc(n)+'</div>';});
+    h+='</div></div>';
+  }
+
+  h+='<div style="display:flex;gap:12px;margin-top:28px;">'
+    +'<button class="tap" data-act="move-bucket" data-id="'+r.id+'" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid '+C.line+';border-radius:12px;padding:10px;font-size:14px;color:'+C.ink+';">'+ico("arrows",15)+'移到'+(r.bucket==="weekday"?"周末":"周中")+'</button>'
+    +'<button class="tap" data-act="del-recipe" data-id="'+r.id+'" style="display:flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;padding:10px 16px;font-size:14px;color:'+C.tomatoDeep+';">'+ico("trash",15)+'删除</button></div>';
+  h+='</div></div>';
+  return h;
+}
+
+/* ---------- add form ---------- */
+function renderAdd(){
+  var fb="background:"+C.boxSoft+";color:"+C.cream+";border:1px solid #3E342C;border-radius:12px;padding:10px 12px;font-size:14px;width:100%;outline:none;";
+  var lbl=function(t){return '<div style="color:'+C.gold+';letter-spacing:.12em;font-size:12px;font-weight:500;margin:16px 0 6px;">'+t+'</div>';};
+  var bk=function(v,t){var on=ui.addBucket===v;return '<button data-act="add-bucket" data-bucket="'+v+'" class="bk" style="flex:1;border-radius:12px;padding:10px;font-size:14px;background:'+(on?C.tomato:C.boxSoft)+';color:'+(on?C.cream:"#B7A893")+';">'+t+'</button>';};
+  return '<div class="ovl" data-act="close"><div class="sheet" data-stop="1" style="background:'+C.box+';border:1px solid #3E342C;">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;"><h2 class="serif" style="color:'+C.cream+';font-size:24px;margin:0;">加一道菜</h2><button data-act="close" style="color:#B7A893;">'+ico("x",22)+'</button></div>'
+    +lbl("菜名")+'<input id="af-name" placeholder="比如 香煎三文鱼" style="'+fb+'">'
+    +lbl("放进哪一桶")+'<div style="display:flex;gap:8px;">'+bk("weekday","周中固定")+bk("weekend","周末抽卡")+'</div>'
+    +'<div style="display:flex;gap:12px;"><div style="flex:1;">'+lbl("用时")+'<input id="af-time" placeholder="15 分钟" style="'+fb+'"></div><div style="flex:1;">'+lbl("份量")+'<input id="af-serv" placeholder="2 人份" style="'+fb+'"></div></div>'
+    +lbl("食材(每行:名称 | 用量 | 备注)")+'<textarea id="af-ing" rows="4" placeholder="意面 | 150g | 细面裹酱强&#10;番茄 | 3个 | 切丁" style="'+fb+'"></textarea>'
+    +lbl("做法(每行一步)")+'<textarea id="af-steps" rows="4" placeholder="烧水煮面&#10;热油下料熬酱" style="'+fb+'"></textarea>'
+    +lbl("黄金比例/备注(每行一条,可空)")+'<textarea id="af-notes" rows="2" placeholder="面150g : 酱50g" style="'+fb+'"></textarea>'
+    +'<button class="tap" data-act="save-recipe" style="width:100%;margin-top:24px;background:'+C.basil+';color:'+C.cream+';border-radius:12px;padding:12px;font-size:14px;font-weight:500;">存进食谱盒</button>'
+    +'</div></div>';
+}
+
+/* ---------- render dispatch ---------- */
+function render(){
+  var html;
+  if(ui.overlay==="checkin")html=renderMain()+renderCheckin();
+  else if(ui.overlay==="routine")html=renderMain()+renderRoutine();
+  else if(ui.overlay==="recipe")html=renderMain()+renderRecipe();
+  else if(ui.overlay==="add")html=renderMain()+renderAdd();
+  else html=renderMain();
+  document.getElementById("app").innerHTML=html;
+}
+
+/* ---------- confetti ---------- */
+function confetti(){
+  var cv=document.createElement("canvas");
+  cv.style.cssText="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:200;";
+  document.body.appendChild(cv);
+  var ctx=cv.getContext("2d"),W=cv.width=innerWidth,H=cv.height=innerHeight;
+  var cols=["#C24A33","#6E8B3D","#CC9A3E","#E89BB6","#4A90D9","#F4EEE1"];
+  var ps=[];for(var i=0;i<150;i++){ps.push({x:W/2+(Math.random()-.5)*140,y:H*.32+(Math.random()-.5)*40,vx:(Math.random()-.5)*13,vy:Math.random()*-15-4,g:.28+Math.random()*.22,size:6+Math.random()*7,color:cols[Math.random()*cols.length|0],rot:Math.random()*Math.PI,vr:(Math.random()-.5)*.32,rect:Math.random()>.45});}
+  var t0=performance.now();
+  function tick(t){var e=t-t0;ctx.clearRect(0,0,W,H);for(var j=0;j<ps.length;j++){var p=ps[j];p.vy+=p.g;p.x+=p.vx;p.y+=p.vy;p.rot+=p.vr;p.vx*=.99;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=Math.max(0,1-e/2700);ctx.fillStyle=p.color;if(p.rect)ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*.6);else{ctx.beginPath();ctx.arc(0,0,p.size/2,0,Math.PI*2);ctx.fill();}ctx.restore();}if(e<2700)requestAnimationFrame(tick);else cv.remove();}
+  requestAnimationFrame(tick);
+}
+
+/* ---------- actions ---------- */
+function toggleMeal(time){
+  var today=new Date(),tKey=dateKey(today),dayKey=JS2DAY[today.getDay()];
+  if(!dayKey)return;var meals=sched[dayKey]||[];
+  var entry=logData[tKey]||{meals:{},complete:false};
+  var wasComplete=meals.length>0&&meals.filter(function(m){return entry.meals[m.time];}).length===meals.length;
+  var nm=Object.assign({},entry.meals);nm[time]=!nm[time];
+  var nowDone=meals.filter(function(m){return nm[m.time];}).length;
+  var complete=meals.length>0&&nowDone===meals.length;
+  logData[tKey]={meals:nm,complete:complete};save(K.log,logData);
+  render();
+  if(complete&&!wasComplete)confetti();
+}
+
+document.getElementById("app").addEventListener("click",function(ev){
+  var el=ev.target.closest("[data-act]");
+  // backdrop close: clicking the overlay bg (which has data-act=close) but not the sheet
+  if(el){
+    var act=el.getAttribute("data-act");
+    if(act==="close"){
+      if(el.classList.contains("ovl")&&ev.target.closest('[data-stop="1"]'))return;
+      ui.overlay=null;ui.editIdx=null;ui.gachaPhase="idle";ui.drawn=null;render();return;
+    }
+    switch(act){
+      case "tab": ui.tab=el.getAttribute("data-tab");ui.gachaPhase="idle";ui.drawn=null;render();return;
+      case "add-open": ui.overlay="add";ui.addBucket=ui.tab;render();return;
+      case "open-checkin": ui.overlay="checkin";render();return;
+      case "open-routine": ui.overlay="routine";ui.editIdx=null;render();return;
+      case "open-recipe": ui.recipeId=el.getAttribute("data-id");ui.overlay="recipe";render();return;
+      case "draw": {
+        var pool=recipes.filter(function(r){return r.bucket==="weekend";});
+        if(!pool.length)return;
+        ui.gachaPhase="shuffling";ui.drawn=null;render();
+        setTimeout(function(){var p=pool;if(pool.length>1&&ui.drawn)p=pool.filter(function(r){return r.id!==ui.drawn;});var pick=p[Math.floor(Math.random()*p.length)];ui.drawn=pick.id;ui.gachaPhase="revealed";render();},750);
+        return;
+      }
+      case "toggle-meal": toggleMeal(el.getAttribute("data-time"));return;
+      case "burst": confetti();return;
+      case "toggle-prep": {var key=el.getAttribute("data-k");ui.prepDone[key]=!ui.prepDone[key];render();return;}
+      case "reset-prep": ui.prepDone={};render();return;
+      case "day": ui.day=el.getAttribute("data-day");ui.editIdx=null;render();return;
+      case "edit-meal": ui.editIdx=parseInt(el.getAttribute("data-idx"),10);render();return;
+      case "cancel-edit": ui.editIdx=null;render();return;
+      case "save-meal": {
+        var idx=parseInt(el.getAttribute("data-idx"),10);var ta=document.getElementById("edit-ta");
+        if(ta){sched[ui.day][idx].food=ta.value;save(K.sch,sched);}ui.editIdx=null;render();return;
+      }
+      case "move-bucket": {
+        var id=el.getAttribute("data-id");recipes.forEach(function(r){if(r.id===id)r.bucket=r.bucket==="weekday"?"weekend":"weekday";});save(K.rec,recipes);render();return;
+      }
+      case "del-recipe": {
+        var did=el.getAttribute("data-id");recipes=recipes.filter(function(r){return r.id!==did;});save(K.rec,recipes);ui.overlay=null;render();return;
+      }
+      case "add-bucket": {
+        ui.addBucket=el.getAttribute("data-bucket");
+        var btns=document.querySelectorAll(".bk");
+        btns.forEach(function(b){var on=b.getAttribute("data-bucket")===ui.addBucket;b.style.background=on?C.tomato:C.boxSoft;b.style.color=on?C.cream:"#B7A893";});
+        return;
+      }
+      case "save-recipe": {
+        var name=(document.getElementById("af-name").value||"").trim();if(!name){document.getElementById("af-name").focus();return;}
+        var parseIng=(document.getElementById("af-ing").value||"").split("\n").map(function(l){return l.trim();}).filter(Boolean).map(function(l){var p=l.split("|").map(function(x){return(x||"").trim();});return{item:p[0]||l,amount:p[1]||"",note:p[2]||""};});
+        var steps=(document.getElementById("af-steps").value||"").split("\n").map(function(l){return l.trim();}).filter(Boolean);
+        var notes=(document.getElementById("af-notes").value||"").split("\n").map(function(l){return l.trim();}).filter(Boolean);
+        recipes.push({id:uid(),name:name,bucket:ui.addBucket,time:(document.getElementById("af-time").value||"").trim()||"—",servings:(document.getElementById("af-serv").value||"").trim()||"—",ingredients:parseIng,steps:steps,notes:notes});
+        save(K.rec,recipes);ui.overlay=null;render();return;
+      }
+    }
+    return;
+  }
+  // clicked overlay background (data-act=close is on .ovl itself)
+});
+
+render();
+</script>
+</body>
+</html>
