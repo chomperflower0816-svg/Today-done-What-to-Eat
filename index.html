@@ -172,6 +172,7 @@ function renderMain(){
     +'<div><div style="color:'+C.gold+';letter-spacing:.28em;font-size:12px;font-weight:500;">KITCHEN · 食谱盒</div>'
     +'<h1 class="serif" style="color:'+C.cream+';font-size:30px;margin:4px 0 0;">今天吃什么</h1></div>'
     +'<button class="tap" data-act="add-open" style="display:inline-flex;align-items:center;gap:4px;background:'+C.tomato+';color:'+C.cream+';border-radius:999px;padding:8px 12px;font-size:14px;">'+ico("plus",16)+'加菜</button></div>'
+    +'<div style="color:'+C.inkSoft+';font-size:12px;margin-top:8px;">📱 把网址发给家人，大家都能看 · 数据存在各自手机里</div>'
     +'<div style="display:flex;gap:12px;margin-top:20px;">'+tabBtn("weekday","calendar","周中",weekday.length+" 道 · 固定")+tabBtn("weekend","sparkles","周末",weekend.length+" 道 · 抽卡")+'</div>'
     +'<div style="margin-top:20px;">';
 
@@ -392,7 +393,16 @@ function render(){
   else if(ui.overlay==="recipe")html=renderMain()+renderRecipe();
   else if(ui.overlay==="add")html=renderMain()+renderAdd();
   else html=renderMain();
+  // 保存滚动位置，避免重新渲染后回到顶部
+  var ovl=document.querySelector('.ovl');
+  var savedScroll=ovl?ovl.scrollTop:0;
+  var savedWin=window.scrollY;
   document.getElementById("app").innerHTML=html;
+  requestAnimationFrame(function(){
+    var newOvl=document.querySelector('.ovl');
+    if(newOvl)newOvl.scrollTop=savedScroll;
+    if(!ui.overlay)window.scrollTo(0,savedWin);
+  });
 }
 
 /* ---------- confetti ---------- */
